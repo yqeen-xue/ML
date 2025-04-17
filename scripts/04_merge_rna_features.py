@@ -24,5 +24,5 @@ merged = pd.merge(clinical, rna_transposed, on="PatientID", how="inner")
 
 # Save merged file
 merged.to_csv("data/clinical2_rna_merged.csv", index=False)
-print("✅ Merged clinical + RNA saved to: data/clinical2_rna_merged.csv")
+print("Merged clinical + RNA saved to: data/clinical2_rna_merged.csv")
 print("Final shape:", merged.shape)
