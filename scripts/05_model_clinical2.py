@@ -17,6 +17,12 @@ def load_data(filepath, clinical_only=False):
     # Drop negative or missing survival times
     df = df[df["time"] >= 0].dropna(subset=["time", "status"])
 
+    # Encode categorical features if present
+    categorical = ["gender", "smoking", "histology", "EGFR", "KRAS", "ALK"]
+    for col in categorical:
+        if col in df.columns:
+            df[col] = df[col].astype(str).astype("category").cat.codes
+
     # Extract y
     y = df[["status", "time"]].copy()
     y["status"] = y["status"].astype(bool)
