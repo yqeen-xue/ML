@@ -11,18 +11,20 @@ os.makedirs("results", exist_ok=True)
 def load_data(filepath, clinical_only=False):
     df = pd.read_csv(filepath)
 
-    # Ensure PatientID is not in the feature set
     if "PatientID" in df.columns:
         df = df.drop(columns=["PatientID"])
 
+    # Drop rows with negative or missing time
+    df = df[df["time"] >= 0].dropna(subset=["time", "status"])
+
     # Outcome definition
-    y = df[["status", "time"]]
+    y = df[["status", "time"]].copy()
     y["status"] = y["status"].astype(bool)
     y_structured = np.array(list(y.itertuples(index=False)), dtype=[("event", bool), ("time", float)])
 
     # Feature selection
     if clinical_only:
-        X = df.loc[:, ["age", "gender", "smoking", "histology", "EGFR", "KRAS", "ALK"]]  # select only clinical
+        X = df.loc[:, ["age", "gender", "smoking", "histology", "EGFR", "KRAS", "ALK"]]
     else:
         X = df.drop(columns=["status", "time"])
 
