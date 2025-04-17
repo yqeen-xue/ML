@@ -1,0 +1,24 @@
+# Ignore all files in the data folder (except for the .gitkeep placeholder)
+data/*
+!data/.gitkeep
+
+# Ignore all files in the results folder (except for the .gitkeep placeholder)
+results/*
+!results/.gitkeep
+
+# Ignore Python cache and compiled files
+__pycache__/
+*.pyc
+
+# Ignore Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore macOS system files
+.DS_Store
+
+# Ignore environment/secret config files (not the conda .yml)
+.env
+
+# Ignore VS Code workspace settings (optional)
+.vscode/
+
