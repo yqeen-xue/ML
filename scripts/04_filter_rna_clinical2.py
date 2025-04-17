@@ -4,7 +4,7 @@ import pandas as pd
 df = pd.read_csv("data/cleaned_clinical2.csv")
 
 # Load RNA sample IDs from rnaseq.txt
-rna = pd.read_csv("dataset2/rnaseq.txt", sep="\t", nrows=1)
+rna = pd.read_csv("/user/home/ms13525/scratch/mshds-ml-data-2025/dataset2/rnaseq.txt", sep="\t", nrows=1)
 rna_samples = list(rna.columns[1:])  # first column = gene names
 
 # Filter clinical2 to only samples with RNA
