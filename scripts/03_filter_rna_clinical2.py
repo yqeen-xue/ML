@@ -12,23 +12,7 @@ rna_samples = list(rna.columns[1:])
 # Filter clinical2 based on RNA samples
 df_rna = df_raw[df_raw["Case ID"].isin(rna_samples)]
 
-# Optional: select variables you're interested in
-columns = ["Case ID", "status", "Age at Histological Diagnosis", "Gender", "Smoking status",
-           "Histology ", "EGFR mutation status", "KRAS mutation status", "ALK translocation status", "Time to Death (days)"]
-df_rna = df_rna[columns].copy()
-df_rna.rename(columns={
-    "Case ID": "PatientID",
-    "Age at Histological Diagnosis": "age",
-    "Gender": "gender",
-    "Smoking status": "smoking",
-    "Histology ": "histology",
-    "EGFR mutation status": "EGFR",
-    "KRAS mutation status": "KRAS",
-    "ALK translocation status": "ALK",
-    "Time to Death (days)": "time"
-}, inplace=True)
 
-# Save
 df_rna.to_csv("data/clinical2_with_rna.csv", index=False)
 print("Done. Saved full clinical2 with RNA coverage to data/clinical2_with_rna.csv")
 print("Shape:", df_rna.shape)
