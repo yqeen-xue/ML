@@ -1,67 +1,55 @@
 import pandas as pd
-import numpy as np
+from sklearn.impute import KNNImputer
 from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
 from sklearn.pipeline import Pipeline
+from sklearn.decomposition import PCA
 from sklearn.model_selection import GridSearchCV, train_test_split
 from sksurv.ensemble import RandomSurvivalForest
 from sksurv.metrics import concordance_index_censored
+import numpy as np
 import os
 
 # Load and prepare the data
 def load_data(filepath):
     df = pd.read_csv(filepath)
-
-    if "PatientID" in df.columns:
-        df = df.drop(columns=["PatientID"])
-
-    # Drop negative or missing survival times
-    df = df[df["time"] >= 0].dropna(subset=["time", "status"])
-
-    # Convert all to numeric (some RNA columns may be non-numeric)
-    df = df.apply(pd.to_numeric, errors="coerce")
-
-    # Drop rows with any remaining missing values
-    df = df.dropna()
-
-    # Extract y (status + time)
+    df = df[df["time"] >= 0]  # Remove negative survival times
+    df = df.dropna(subset=["status", "time"])  # Remove rows missing y
     y = df[["status", "time"]].copy()
     y["status"] = y["status"].astype(bool)
     y_struct = np.array(list(y.itertuples(index=False)), dtype=[("event", bool), ("time", float)])
-
-    # Features = everything else
-    X = df.drop(columns=["status", "time"])
-
+    X = df.drop(columns=["PatientID", "status", "time"])
     return X, y_struct
 
 # Main execution
 def main():
     os.makedirs("results", exist_ok=True)
     filepath = "data/clinical2_rna_merged.csv"
-
-    # Load and clean data
     X, y = load_data(filepath)
 
-    # Standardize and apply PCA
+    # KNN imputation + scaling
+    imputer = KNNImputer(n_neighbors=5)
+    X_imputed = imputer.fit_transform(X)
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    X_scaled = scaler.fit_transform(X_imputed)
 
-    pca = PCA(n_components=50)  # or adjust n_components if needed
+    # Reduce RNA dimensionality with PCA
+    pca = PCA(n_components=0.95)  # retain 95% variance
     X_pca = pca.fit_transform(X_scaled)
 
     # Split into train/test
     X_train, X_test, y_train, y_test = train_test_split(X_pca, y, test_size=0.2, random_state=42)
 
-    # Pipeline (only the model, since data is already scaled + reduced)
+    # Define model and pipeline
     rsf = RandomSurvivalForest(random_state=42)
+    pipe = Pipeline([("rsf", rsf)])
 
+    # Grid search with 3-fold CV
     param_grid = {
-        "n_estimators": [100, 200],
-        "max_depth": [3, 5, 7],
-        "min_samples_leaf": [3, 5],
+        "rsf__n_estimators": [100, 200],
+        "rsf__max_depth": [3, 5],
+        "rsf__min_samples_leaf": [3, 5],
     }
-
-    gs = GridSearchCV(rsf, param_grid=param_grid, cv=3, n_jobs=-1)
+    gs = GridSearchCV(pipe, param_grid=param_grid, cv=3, n_jobs=-1)
     gs.fit(X_train, y_train)
 
     # Evaluate
@@ -72,7 +60,7 @@ def main():
 
     # Save results
     pd.DataFrame([{
-        "model": "RandomSurvivalForest_PCA",
+        "model": "RandomSurvivalForest_PCA_KNN",
         "c_index": round(c_index, 4),
         **gs.best_params_
     }]).to_csv("results/clinical_model_results_pca.csv", index=False)
