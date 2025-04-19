@@ -1,73 +1,90 @@
+# scripts/05_extract_image_features_dataset2.py
+
 import os
 import numpy as np
 import pandas as pd
-import nibabel as nib
-import skimage.measure
-from scipy.spatial.distance import pdist
+import pydicom
+from skimage.feature import graycomatrix, greycoprops
+from tqdm import tqdm
 
-# ========== Feature Extraction Functions ==========
+# -------------------------
+# Load a DICOM series into a 3D volume
+# -------------------------
+def load_dicom_volume(dcm_dir):
+    dcm_files = sorted([
+        os.path.join(dcm_dir, f) for f in os.listdir(dcm_dir) if f.endswith('.dcm')
+    ])
+    slices = [pydicom.dcmread(f).pixel_array for f in dcm_files]
+    volume = np.stack(slices, axis=0)
+    return volume
 
-def tumour_features(tumour_array, voxel_size):
-    if np.sum(tumour_array) > 0:
-        verts, faces, _, _ = skimage.measure.marching_cubes(tumour_array, 0.5, spacing=voxel_size)
-        area = skimage.measure.mesh_surface_area(verts, faces)
-        volume = np.sum(tumour_array > 0.1) * np.prod(voxel_size)
-        radius = (3.0 / (4.0 * np.pi) * volume) ** (1.0 / 3)
-        distance = pdist(verts)
-        features = {
-            "maximum_diameter": np.amax(distance),
-            "surface_area": area,
-            "surface_to_volume_ratio": area / volume,
-            "volume": volume
-        }
-        return features
-    else:
-        return {
-            "maximum_diameter": 0,
-            "surface_area": 0,
-            "surface_to_volume_ratio": 0,
-            "volume": 0
-        }
+# -------------------------
+# Extract intensity and texture features from volume
+# -------------------------
+def extract_features(volume):
+    features = {}
 
-def save_features_csv(patient_ids, features_list, feature_names, output_path):
-    df = pd.DataFrame(features_list, columns=feature_names)
-    df['PatientID'] = patient_ids
-    df.set_index('PatientID', inplace=True)
-    df.to_csv(output_path)
+    # Compute mean projection along axial slices
+    mean_img = np.mean(volume, axis=0)
 
-# ========== Main ==========
+    # Normalize to 0-255 for texture analysis
+    scaled_img = ((mean_img - mean_img.min()) / (mean_img.max() - mean_img.min()) * 255).astype(np.uint8)
 
+    # Basic intensity statistics
+    features['mean_intensity'] = np.mean(mean_img)
+    features['std_intensity'] = np.std(mean_img)
+    features['min_intensity'] = np.min(mean_img)
+    features['max_intensity'] = np.max(mean_img)
+
+    # Texture features from GLCM
+    glcm = graycomatrix(scaled_img, distances=[1], angles=[0], levels=256, symmetric=True, normed=True)
+    features['glcm_contrast'] = greycoprops(glcm, 'contrast')[0, 0]
+    features['glcm_homogeneity'] = greycoprops(glcm, 'homogeneity')[0, 0]
+    features['glcm_energy'] = greycoprops(glcm, 'energy')[0, 0]
+    features['glcm_correlation'] = greycoprops(glcm, 'correlation')[0, 0]
+
+    return features
+
+# -------------------------
+# Main function to iterate over AMC and R01 patients
+# -------------------------
 def main():
-    print("Extracting image features from dataset2 segmentation masks...")
+    root = "/user/home/ms13525/scratch/mshds-ml-data-2025/dataset2"
+    output_csv = "outputs/image_features_dataset2.csv"
+    patient_ids = [d for d in os.listdir(root) if d.startswith("AMC") or d.startswith("R01")]
 
-    base_dir = "/user/home/ms13525/scratch/mshds-ml-data-2025/dataset2"
-    features = []
-    patient_ids = []
+    results = []
 
-    for pid in sorted(os.listdir(base_dir)):
-        patient_dir = os.path.join(base_dir, pid)
-        if not os.path.isdir(patient_dir):
+    for pid in tqdm(patient_ids):
+        patient_dir = os.path.join(root, pid)
+        subdirs = [os.path.join(patient_dir, s) for s in os.listdir(patient_dir)]
+
+        # Collect candidate subfolders with 'CT' in name
+        candidate_ct_dirs = []
+        for sub in subdirs:
+            if os.path.isdir(sub):
+                inner_dirs = [os.path.join(sub, name) for name in os.listdir(sub)
+                              if os.path.isdir(os.path.join(sub, name)) and 'CT' in name.upper()]
+                candidate_ct_dirs.extend(inner_dirs)
+
+        if not candidate_ct_dirs:
+            print(f"[!] No CT folder found for {pid}")
             continue
 
-        for root, _, files in os.walk(patient_dir):
-            for file in files:
-                if file.endswith("_automated_approx_segm.nii.gz"):
-                    seg_path = os.path.join(root, file)
-                    try:
-                        nii = nib.load(seg_path)
-                        mask_data = nii.get_fdata()
-                        voxel_size = nii.header.get_zooms()
-                        binary_mask = mask_data > 0
-                        feat_dict = tumour_features(binary_mask, voxel_size)
-                        features.append(list(feat_dict.values()))
-                        patient_ids.append(pid)
-                        print(f"Processed: {pid}")
-                    except Exception as e:
-                        print(f"Error processing {seg_path}: {e}")
+        # Choose the CT folder with the most DICOM files
+        best_ct_dir = max(candidate_ct_dirs, key=lambda d: len([f for f in os.listdir(d) if f.endswith(".dcm")]))
+        try:
+            volume = load_dicom_volume(best_ct_dir)
+            feats = extract_features(volume)
+            feats['patient_id'] = pid
+            results.append(feats)
+        except Exception as e:
+            print(f"[!] Skipped {pid} due to error: {e}")
+            continue
 
-    feature_names = ["maximum_diameter", "surface_area", "surface_to_volume_ratio", "volume"]
-    save_features_csv(patient_ids, features, feature_names, "data/features_segm_tumour.csv")
-    print("Saved: data/features_segm_tumour.csv")
+    df = pd.DataFrame(results)
+    df.to_csv(output_csv, index=False)
+    print(f"[✓] Features saved to {output_csv}")
 
 if __name__ == "__main__":
     main()
