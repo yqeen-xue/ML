@@ -4,7 +4,7 @@ import os
 import numpy as np
 import pandas as pd
 import pydicom
-from skimage.feature import graycomatrix, greycoprops
+from skimage.feature.texture import graycomatrix, greycoprops
 from tqdm import tqdm
 
 # -------------------------
