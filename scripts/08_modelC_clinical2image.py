@@ -27,7 +27,7 @@ def load_image_features(image_feat_path):
     image_feat = pd.read_csv(image_feat_path)
     image_feat.reset_index(inplace=True)
     image_feat.rename(columns={"index": "PatientID"}, inplace=True)
-    image_feat["PatientID"] = image_feat["PatientID"].str.extract(r"(R01-\d+|AMC-\d+)")
+    image_feat["PatientID"] = image_feat["PatientID"].astype(str).str.extract(r"(R01-\d+|AMC-\d+)")
 
     return image_feat
 
