@@ -1,5 +1,3 @@
-# scripts/05_extract_image_features.py
-
 import os
 import numpy as np
 import pandas as pd
@@ -112,6 +110,7 @@ def main():
             continue
 
     df = pd.DataFrame(results)
+    os.makedirs(os.path.dirname(output_csv), exist_ok=True)
     df.to_csv(output_csv, index=False)
     print(f"[✓] Features saved to {output_csv}")
 

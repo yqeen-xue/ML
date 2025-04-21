@@ -14,15 +14,10 @@ def load_data(filepath):
     # Binary classification target
     y = df["status"].astype(int)
 
-    # Safely drop non-feature columns (e.g., ID, label, survival time)
-    drop_cols = [col for col in ["PatientID", "status", "time"] if col in df.columns]
-    X = df.drop(columns=drop_cols)
+    # Drop identifier and outcome columns
+    X = df.drop(columns=["PatientID", "status", "time"])
+    X = X.select_dtypes(include=[np.number])  # Keep only numeric columns
 
-    # Keep only numeric features
-    X = X.select_dtypes(include=[np.number])
-
-    # Debug print
-    print(f"[i] Feature shape: {X.shape}, Label balance: {np.bincount(y)}")
 
     return X, y
 
@@ -34,12 +29,10 @@ def main():
     X, y = load_data(filepath)
 
     # Train-test split
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
     # Define classifier pipeline with scaler
-    clf = RandomForestClassifier(random_state=42, class_weight="balanced")
+    clf = RandomForestClassifier(random_state=42)
     pipe = Pipeline([
         ("scaler", StandardScaler()),
         ("clf", clf)
@@ -65,16 +58,16 @@ def main():
     acc = accuracy_score(y_test, y_pred)
 
     print("Best Params:", gs.best_params_)
-    print(f"[✓] Model A (balanced) Results — AUC: {auc:.4f}, F1: {f1:.4f}, Accuracy: {acc:.4f}")
+    print(f"AUC: {auc:.4f}, F1 Score: {f1:.4f}, Accuracy: {acc:.4f}")
 
     # Save result
     pd.DataFrame([{
-        "model": "ModelA_Clinical2_RF_Balanced",
+        "model": "ModelA_Clinical2_RF",
         "auc": round(auc, 4),
         "f1_score": round(f1, 4),
         "accuracy": round(acc, 4),
         **gs.best_params_
-    }]).to_csv("results/modelA_clinical2_balanced_results.csv", index=False)
+    }]).to_csv("results/modelA_clinical2_results.csv", index=False)
 
 if __name__ == "__main__":
     main()
