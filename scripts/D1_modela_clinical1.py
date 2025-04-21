@@ -1,5 +1,3 @@
-# scripts/D1_modela_clinical1.py (patched for clinical1 columns)
-
 import pandas as pd
 import numpy as np
 import os
@@ -23,6 +21,7 @@ def load_data(filepath):
 
     y = df["status"].astype(int)
     X = df.drop(columns=["PatientID", "status"])
+    X = X.drop(columns=["deadstatus.event", "Survival.time"], errors="ignore")
     X = X.select_dtypes(include=[np.number]).dropna(axis=1, how="any")
 
     return X, y
