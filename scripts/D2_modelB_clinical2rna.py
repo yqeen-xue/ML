@@ -14,7 +14,7 @@ def load_data(filepath):
     df = df.dropna(subset=["status"])
 
     y = df["status"].astype(int)
-    X = df.drop(columns=["PatientID", "status", "time"])
+    X = df.drop(columns=["PatientID", "status"])
     X = X.select_dtypes(include=[np.number]).dropna(axis=1, how="any")
 
     return X, y
