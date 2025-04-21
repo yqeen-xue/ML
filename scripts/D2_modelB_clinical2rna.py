@@ -13,7 +13,7 @@ def load_data(filepath):
 
     y = df["status"].astype(int)
     X = df.drop(columns=["PatientID", "status", "time"])  # Direct use without cleaning
-
+    X = X.select_dtypes(include=[np.number]).dropna(axis=1, how="any")
     return X, y
 
 def main():
