@@ -1,4 +1,4 @@
-# scripts/D1_modela_clinical1.py
+# scripts/D1_modela_clinical1.py (patched for clinical1 columns)
 
 import pandas as pd
 import numpy as np
@@ -14,6 +14,11 @@ from sklearn.model_selection import train_test_split
 # -------------------------
 def load_data(filepath):
     df = pd.read_csv(filepath)
+
+    # Patch: convert "deadstatus.event" to status if needed
+    if "status" not in df.columns and "deadstatus.event" in df.columns:
+        df["status"] = df["deadstatus.event"]
+
     df = df.dropna(subset=["status"])
 
     y = df["status"].astype(int)
