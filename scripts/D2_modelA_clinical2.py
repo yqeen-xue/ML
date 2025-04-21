@@ -4,9 +4,10 @@ import os
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
 
-# Load already-cleaned clinical2 (no RNA) dataset
+# Load clinical2 dataset with positive and negative classes
 def load_data(filepath):
     df = pd.read_csv(filepath)
 
@@ -20,17 +21,20 @@ def load_data(filepath):
 
 def main():
     os.makedirs("results", exist_ok=True)
-    filepath = "data/clinical2_norna.csv"
+    filepath = "data/clinical2_with_rna.csv"
 
-    # Load prepared dataset
+    # Load dataset
     X, y = load_data(filepath)
 
     # Train-test split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
-    # Define classifier pipeline
+    # Define classifier pipeline with scaler
     clf = RandomForestClassifier(random_state=42)
-    pipe = Pipeline([("clf", clf)])
+    pipe = Pipeline([
+        ("scaler", StandardScaler()),
+        ("clf", clf)
+    ])
 
     # Parameter grid for tuning
     param_grid = {
