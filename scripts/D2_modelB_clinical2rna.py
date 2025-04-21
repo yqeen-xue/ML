@@ -11,7 +11,6 @@ from sklearn.preprocessing import StandardScaler
 # -------------------------
 def load_data(filepath):
     df = pd.read_csv(filepath)
-    df = df[df["time"] >= 0]
     df = df.dropna(subset=["status"])
 
     y = df["status"].astype(int)
