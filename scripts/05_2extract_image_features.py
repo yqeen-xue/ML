@@ -1,11 +1,42 @@
-# scripts/05_extract_image_features_dataset2.py
+# scripts/05_extract_image_features.py
 
 import os
 import numpy as np
 import pandas as pd
 import pydicom
-from skimage.feature.texture import graycomatrix, greycoprops
+from skimage.feature import graycomatrix
 from tqdm import tqdm
+
+# -------------------------
+# Custom implementation to compute GLCM properties
+# -------------------------
+def compute_glcm_props(glcm):
+    props = {}
+    glcm = glcm[:, :, 0, 0]  # extract first (and only) angle & distance
+
+    i_indices, j_indices = np.indices(glcm.shape)
+
+    # Contrast: sum of (i - j)^2 * P(i, j)
+    props['glcm_contrast'] = np.sum((i_indices - j_indices) ** 2 * glcm)
+
+    # Homogeneity: sum of P(i, j) / (1 + |i - j|)
+    props['glcm_homogeneity'] = np.sum(glcm / (1.0 + np.abs(i_indices - j_indices)))
+
+    # Energy: sum of P(i, j)^2
+    props['glcm_energy'] = np.sum(glcm ** 2)
+
+    # Correlation
+    mean_i = np.sum(i_indices * glcm)
+    mean_j = np.sum(j_indices * glcm)
+    std_i = np.sqrt(np.sum(((i_indices - mean_i) ** 2) * glcm))
+    std_j = np.sqrt(np.sum(((j_indices - mean_j) ** 2) * glcm))
+
+    if std_i > 0 and std_j > 0:
+        props['glcm_correlation'] = np.sum(((i_indices - mean_i) * (j_indices - mean_j) * glcm) / (std_i * std_j))
+    else:
+        props['glcm_correlation'] = 0.0
+
+    return props
 
 # -------------------------
 # Load a DICOM series into a 3D volume
@@ -36,12 +67,10 @@ def extract_features(volume):
     features['min_intensity'] = np.min(mean_img)
     features['max_intensity'] = np.max(mean_img)
 
-    # Texture features from GLCM
+    # GLCM texture features
     glcm = graycomatrix(scaled_img, distances=[1], angles=[0], levels=256, symmetric=True, normed=True)
-    features['glcm_contrast'] = greycoprops(glcm, 'contrast')[0, 0]
-    features['glcm_homogeneity'] = greycoprops(glcm, 'homogeneity')[0, 0]
-    features['glcm_energy'] = greycoprops(glcm, 'energy')[0, 0]
-    features['glcm_correlation'] = greycoprops(glcm, 'correlation')[0, 0]
+    glcm_props = compute_glcm_props(glcm)
+    features.update(glcm_props)
 
     return features
 
