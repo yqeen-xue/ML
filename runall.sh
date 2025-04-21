@@ -2,8 +2,14 @@
 set -e  
 
 echo "STEP 1: Data Cleaning"
-python scripts/01_pre_clinical1.py
-python scripts/02_pre_clinical2.py
+python scripts/01_pre_clinical1.py  \
+--input /user/home/ms13525/scratch/mshds-ml-data-2025/dataset1/clinical1.csv \
+--output data/cleaned_clinical1.csv
+
+python scripts/02_pre_clinical2.py \
+--input /user/home/ms13525/scratch/mshds-ml-data-2025/dataset2/clinical2.csv \
+--output data/cleaned_clinical2.csv
+
 
 echo ""
 echo "STEP 2: Merge RNA with clinical2"
