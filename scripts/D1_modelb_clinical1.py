@@ -24,6 +24,7 @@ def load_data(clinical_path, image_path):
     # Drop non-numeric / ID columns
     y = df["status"].astype(int)
     X = df.drop(columns=["PatientID", "patient_id", "status"])
+    X = X.drop(columns=["deadstatus.event", "Survival.time"], errors="ignore")
     X = X.select_dtypes(include=[np.number]).dropna(axis=1, how="any")
 
     return X, y
