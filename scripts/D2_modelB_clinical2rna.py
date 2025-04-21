@@ -1,10 +1,9 @@
-# scripts/D2_modelB_clinical2rna.py
 
 import pandas as pd
 import numpy as np
 import os
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
+from sklearn.model_selection import GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
 from sklearn.preprocessing import StandardScaler
@@ -24,6 +23,29 @@ def load_data(filepath):
     return X, y
 
 # -------------------------
+# Manual stratified split to ensure both classes exist
+# -------------------------
+def manual_balanced_split(X, y, test_frac=0.1):
+    X0 = X[y == 0]
+    y0 = y[y == 0]
+    X1 = X[y == 1]
+    y1 = y[y == 1]
+
+    # Shuffle
+    X0, y0 = X0.sample(frac=1, random_state=42), y0.sample(frac=1, random_state=42)
+    X1, y1 = X1.sample(frac=1, random_state=42), y1.sample(frac=1, random_state=42)
+
+    n0 = int(len(X0) * (1 - test_frac))
+    n1 = int(len(X1) * (1 - test_frac))
+
+    X_train = pd.concat([X0[:n0], X1[:n1]])
+    y_train = pd.concat([y0[:n0], y1[:n1]])
+    X_test = pd.concat([X0[n0:], X1[n1:]])
+    y_test = pd.concat([y0[n0:], y1[n1:]])
+
+    return X_train, X_test, y_train, y_test
+
+# -------------------------
 # Main script
 # -------------------------
 def main():
@@ -31,17 +53,9 @@ def main():
     filepath = "data/clinical2_rna_merged.csv"
 
     X, y = load_data(filepath)
-
-    # Stratified split
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.1, stratify=y, random_state=42
-    )
+    X_train, X_test, y_train, y_test = manual_balanced_split(X, y, test_frac=0.1)
 
     print("Train class distribution:", np.bincount(y_train))
-
-    if len(np.unique(y_train)) < 2:
-        print("[!] Training set only contains one class. Skipping model.")
-        return
 
     # Pipeline with scaler and classifier
     clf = RandomForestClassifier(random_state=42)
@@ -56,12 +70,10 @@ def main():
         "clf__min_samples_leaf": [3, 5]
     }
 
-    cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
-
     gs = GridSearchCV(
         pipe,
         param_grid=param_grid,
-        cv=cv,
+        cv=3,
         scoring="roc_auc",
         n_jobs=-1,
         error_score=np.nan
