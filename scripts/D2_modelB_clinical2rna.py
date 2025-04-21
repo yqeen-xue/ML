@@ -5,26 +5,46 @@ from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
+from sklearn.preprocessing import StandardScaler
 
+# -------------------------
+# Load dataset with clinical + RNA features
+# -------------------------
 def load_data(filepath):
     df = pd.read_csv(filepath)
     df = df[df["time"] >= 0]
-    df = df.dropna(subset=["status"])  # Keep only samples with target
+    df = df.dropna(subset=["status"])
 
     y = df["status"].astype(int)
-    X = df.drop(columns=["PatientID", "status", "time"])  # Direct use without cleaning
+    X = df.drop(columns=["PatientID", "status", "time"])
     X = X.select_dtypes(include=[np.number]).dropna(axis=1, how="any")
+
     return X, y
 
+# -------------------------
+# Main script
+# -------------------------
 def main():
     os.makedirs("results", exist_ok=True)
-    filepath = "data/clinical2_rna.csv"
+    filepath = "data/clinical2_rna_merged.csv"  # use merged version with balanced labels
+
     X, y = load_data(filepath)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # Stratified split
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, stratify=y, random_state=42
+    )
 
+    if len(np.unique(y_train)) < 2:
+        print("[!] Training set only contains one class. Skipping model.")
+        return
+
+    # Pipeline with scaler and classifier
     clf = RandomForestClassifier(random_state=42)
-    pipe = Pipeline([("clf", clf)])
+    pipe = Pipeline([
+        ("scaler", StandardScaler()),
+        ("clf", clf)
+    ])
 
     param_grid = {
         "clf__n_estimators": [100, 200],
