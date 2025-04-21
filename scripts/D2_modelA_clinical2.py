@@ -16,6 +16,8 @@ def load_data(filepath):
 
     # Drop identifier and outcome columns
     X = df.drop(columns=["PatientID", "status", "time"])
+    X = X.select_dtypes(include=[np.number])  # Keep only numeric columns
+
 
     return X, y
 
