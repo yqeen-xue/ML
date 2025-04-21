@@ -1,52 +1,77 @@
+
 import pandas as pd
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier
+import os
 from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import cross_val_score
-from sklearn.metrics import make_scorer, roc_auc_score, f1_score
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
 
 # -------------------------
-# Load clinical and image features
+# Load clinical1 and image features
 # -------------------------
-clinical_df = pd.read_csv("data/clinical1.csv")
-image_df = pd.read_csv("outputs/image_features_dataset1.csv")
+def load_data(clinical_path, image_path):
+    df_clin = pd.read_csv(clinical_path)
+    df_img = pd.read_csv(image_path)
+
+    # Map status if not present
+    if "status" not in df_clin and "deadstatus.event" in df_clin.columns:
+        df_clin["status"] = df_clin["deadstatus.event"]
+
+    # Merge
+    df = pd.merge(df_clin, df_img, left_on="PatientID", right_on="patient_id", how="inner")
+
+    # Drop non-numeric / ID columns
+    y = df["status"].astype(int)
+    X = df.drop(columns=["PatientID", "patient_id", "status"])
+    X = X.select_dtypes(include=[np.number]).dropna(axis=1, how="any")
+
+    return X, y
 
 # -------------------------
-# Merge features on patient_id
+# Stratified split
 # -------------------------
-merged_df = clinical_df.merge(image_df, how="inner", left_on="PatientID", right_on="patient_id")
+def stratified_split(X, y, test_frac=0.1):
+    return train_test_split(X, y, test_size=test_frac, random_state=42, stratify=y)
 
 # -------------------------
-# Prepare features and labels
+# Main
 # -------------------------
-X = merged_df.drop(columns=["PatientID", "patient_id", "Survival.time", "deadstatus.event"])
-y = merged_df["deadstatus.event"].astype(int)
+def main():
+    os.makedirs("results", exist_ok=True)
 
-# Keep only numeric columns
-X = X.select_dtypes(include=[np.number]).dropna(axis=1, how='any')
+    clinical_path = "data/cleaned_clinical1.csv"
+    image_path = "outputs/image_features_dataset1.csv"
 
-# -------------------------
-# Define pipeline
-# -------------------------
-pipeline = Pipeline([
-    ("scaler", StandardScaler()),
-    ("clf", RandomForestClassifier(random_state=42))
-])
+    X, y = load_data(clinical_path, image_path)
+    X_train, X_test, y_train, y_test = stratified_split(X, y)
 
-# -------------------------
-# Cross-validation
-# -------------------------
-auc_scores = cross_val_score(
-    pipeline, X, y, cv=5,
-    scoring=make_scorer(roc_auc_score)
-)
+    print("Train class distribution:", np.bincount(y_train))
 
-f1_scores = cross_val_score(
-    pipeline, X, y, cv=5,
-    scoring=make_scorer(f1_score)
-)
+    pipe = Pipeline([
+        ("scaler", StandardScaler()),
+        ("clf", LogisticRegression(class_weight="balanced", max_iter=1000, random_state=42))
+    ])
 
-print("[✓] Model B (clinical1 + segmentation features) Results")
-print(f"AUC (mean ± std): {auc_scores.mean():.3f} ± {auc_scores.std():.3f}")
-print(f"F1  (mean ± std): {f1_scores.mean():.3f} ± {f1_scores.std():.3f}")
+    pipe.fit(X_train, y_train)
+
+    y_pred_proba = pipe.predict_proba(X_test)[:, 1]
+    y_pred = pipe.predict(X_test)
+
+    auc = roc_auc_score(y_test, y_pred_proba)
+    f1 = f1_score(y_test, y_pred)
+    acc = accuracy_score(y_test, y_pred)
+
+    print(f"[✓] Model B (D1) Results — AUC: {auc:.4f}, F1: {f1:.4f}, Accuracy: {acc:.4f}")
+
+    pd.DataFrame([{
+        "model": "ModelB_D1_Clinical1Image_LogReg",
+        "auc": round(auc, 4),
+        "f1_score": round(f1, 4),
+        "accuracy": round(acc, 4),
+        "classifier": "LogisticRegression"
+    }]).to_csv("results/modelB_clinical1image_results.csv", index=False)
+
+if __name__ == "__main__":
+    main()
