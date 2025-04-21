@@ -27,6 +27,9 @@ def load_data(clinical_rna_path, image_path):
     y = df["status"].astype(int)
     X = df.drop(columns=["status"])
 
+    # ✅ Remove non-numeric columns to avoid StandardScaler / PCA errors
+    X = X.select_dtypes(include=[np.number]).dropna(axis=1, how="any")
+
     return X, y
 
 
@@ -72,7 +75,7 @@ def main():
     f1 = f1_score(y_test, y_pred)
     acc = accuracy_score(y_test, y_pred)
 
-    print(f"[\u2713] Optimized Model D Results — AUC: {auc:.4f}, F1: {f1:.4f}, Accuracy: {acc:.4f}")
+    print(f"[✓] Optimized Model D Results — AUC: {auc:.4f}, F1: {f1:.4f}, Accuracy: {acc:.4f}")
 
     # Save result
     pd.DataFrame([{
